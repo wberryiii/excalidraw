@@ -38,6 +38,10 @@ interface ImportMetaEnv {
 
   VITE_APP_GIT_SHA: string;
 
+  // wberryiii addition: optional plaintext scene-history capture endpoint.
+  // See excalidraw-app/data/httpStorage.ts for details.
+  VITE_APP_HISTORY_CAPTURE_URL: string;
+
   MODE: string;
 
   DEV: string;
