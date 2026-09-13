@@ -33,6 +33,36 @@ const HTTP_STORAGE_BACKEND_URL = import.meta.env
   .VITE_APP_HTTP_STORAGE_BACKEND_URL;
 const SCENE_VERSION_LENGTH_BYTES = 4;
 
+// --- wberryiii addition: plaintext history capture -------------------------
+// Homelab-only addition, not upstream. The real room storage above stays
+// end-to-end encrypted exactly as designed (the server never sees the
+// decryption key). This is a *separate*, purely additive side-channel: if
+// VITE_APP_HISTORY_CAPTURE_URL is set, every scene save also POSTs the
+// plaintext elements to that URL for local timestamped-history capture. It
+// never blocks or can fail the real save (errors are swallowed), and if the
+// env var is unset this is a complete no-op.
+const HISTORY_CAPTURE_URL = import.meta.env.VITE_APP_HISTORY_CAPTURE_URL;
+
+const captureHistoryPlaintext = (
+  roomId: string,
+  elements: readonly ExcalidrawElement[],
+  sceneVersion: number,
+  ) => {
+    if (!HISTORY_CAPTURE_URL) {
+      return;
+    }
+    try {
+      fetch(HISTORY_CAPTURE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId, sceneVersion, elements }),
+      }).catch(() => {});
+    } catch (error) {
+      // history capture must never break or block the real encrypted save
+    }
+  };
+// ----------------------------------------------------------------------------
+
 // There is a lot of intentional duplication with the firebase file
 // to prevent modifying upstream files and ease futur maintenance of this fork
 
@@ -259,6 +289,10 @@ const saveElementsToBackend = async (
   elements: SyncableExcalidrawElement[],
   sceneVersion: number,
 ) => {
+  // wberryiii addition: fire-and-forget plaintext capture, see above. Does
+    // not affect or delay the real encrypted save below in any way.
+  captureHistoryPlaintext(roomId, elements, sceneVersion);
+  
   const { ciphertext, iv } = await encryptElements(roomKey, elements);
 
   // Concatenate Scene Version, IV with encrypted data (IV does not have to be secret).
